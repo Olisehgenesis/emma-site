@@ -5,7 +5,13 @@ Reads the original photography in ../ALISTER and the renders embedded in the
 company profile PDF, then writes responsive WebP files to public/media/<slug>/
 plus src/media.json describing every image.
 
+The generated files are committed, so this script only needs to run when the
+source photography or the profile changes. The site build does not use it.
+
 Run:  python3 scripts/build_media.py
+
+Override the source locations with ALLISTAR_ASSETS and ALLISTAR_PDF, or by
+placing the profile at ../Allistar Company Profile.pdf.
 """
 
 from __future__ import annotations
@@ -23,11 +29,28 @@ import pymupdf
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT.parent / "ALISTER"
-PDF = Path("/Users/olisehgenesis/Downloads/Allistar Company Profile (1).pdf")
+ASSETS = Path(os.environ.get("ALLISTAR_ASSETS") or ROOT.parent / "ALISTER")
+PDF_CANDIDATES = [
+    os.environ.get("ALLISTAR_PDF"),
+    ROOT.parent / "Allistar Company Profile (1).pdf",
+    ROOT.parent / "Allistar Company Profile.pdf",
+    Path.home() / "Downloads/Allistar Company Profile (1).pdf",
+]
 OUT = ROOT / "public" / "media"
 MANIFEST = ROOT / "src" / "media.json"
-CACHE = Path("/tmp/allistar/pdfimg")
+
+
+def find_pdf() -> Path:
+    for candidate in PDF_CANDIDATES:
+        if candidate and Path(candidate).exists():
+            return Path(candidate)
+    raise SystemExit(
+        "Company profile PDF not found. Set ALLISTAR_PDF to its path, or place it "
+        f"next to the project folder. Looked in: {ROOT.parent}"
+    )
+
+
+PDF = None  # resolved in main()
 
 WIDTHS = (480, 960, 1600)
 QUALITY = 74
@@ -412,8 +435,8 @@ def write_portraits(pdf: PdfImages) -> dict:
 
 
 def main() -> None:
-    if not PDF.exists():
-        raise SystemExit(f"Company profile not found: {PDF}")
+    global PDF
+    PDF = find_pdf()
     if not ASSETS.exists():
         raise SystemExit(f"Photography folder not found: {ASSETS}")
 
